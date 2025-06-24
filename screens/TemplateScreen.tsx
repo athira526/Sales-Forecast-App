@@ -15,8 +15,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
-import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
+import { forecastApi } from '../api/api'; // Adjust the import path as necessary
 
 const TemplateScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -45,7 +45,7 @@ const TemplateScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const { uri } = result.assets[0];
+        const { uri, name } = result.assets[0];
         const fileContent = await FileSystem.readAsStringAsync(uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
@@ -61,37 +61,26 @@ const TemplateScreen: React.FC = () => {
         }
 
         const formData = new FormData();
-        const file = {
+        formData.append('file', {
           uri,
-          name: 'upload.xlsx',
+          name: name || 'upload.xlsx',
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        };
-        formData.append('file', file as any);
+        } as any);
 
-        const response = await axios.post('http://10.12.68.234:5000/upload', formData, {
+        const response = await forecastApi.post('/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
 
         Alert.alert('Success', `File uploaded successfully! Rows: ${response.data.row_count}`);
-        console.log('Backend response:', response.data);
         setModalVisible(false);
-        navigation.navigate('Forecast');
+        navigation.navigate('ForecastScreen');
       } else {
         Alert.alert('Cancelled', 'No file selected.');
       }
     } catch (error: any) {
-      console.error('Upload error details:', {
-        message: error.message,
-        code: error.code,
-        config: error.config,
-        response: error.response ? {
-          status: error.response.status,
-          data: error.response.data,
-        } : null,
-      });
-      Alert.alert('Error', `Failed to upload file: ${error.message || 'Network error. Is the server running?'}`);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to upload file. Please ensure you are logged in and try again.');
     } finally {
       setUploading(false);
     }
@@ -100,15 +89,15 @@ const TemplateScreen: React.FC = () => {
   const downloadSample = async () => {
     try {
       const sampleData = Array.from({ length: 37 }, (_, i) => {
-        const date = new Date(2023, 0, i + 1); // Jan 1 to Feb 6, 2023
+        const date = new Date(2023, 0, i + 1);
         return {
-          date: date.toISOString().split('T')[0], // YYYY-MM-DD
-          history: i < 30 ? 100 + i * 5 : null, // 30 history values, null for last 7
-          onpromotion: i % 2, // 0 or 1 for 37 days
-          is_holiday: i % 7 === 0 ? 1 : 0, // Holiday every 7th day
-          transactions: 50 + i * 2, // 37 values
-          store_nbr: 1, // Fixed store ID
-          item_nbr: 1, // Fixed item ID
+          date: date.toISOString().split('T')[0],
+          history: i < 30 ? 100 + i * 5 : null,
+          onpromotion: i % 2,
+          is_holiday: i % 7 === 0 ? 1 : 0,
+          transactions: 50 + i * 2,
+          store_nbr: 1,
+          item_nbr: 1,
         };
       });
 
@@ -124,7 +113,6 @@ const TemplateScreen: React.FC = () => {
 
       await Sharing.shareAsync(uri);
     } catch (error: any) {
-      console.error('Download error:', error);
       Alert.alert('Error', 'Failed to download sample file.');
     }
   };
@@ -359,8 +347,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelButton: {
-    borderWidth: 1,
-    borderColor: '#97FEED',
+    backgroundColor: '#97FEED',
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -368,7 +355,7 @@ const styles = StyleSheet.create({
     width: '60%',
   },
   cancelButtonText: {
-    color: '#97FEED',
+    color: '#050A30',
     fontSize: 16,
     fontWeight: '600',
   },
